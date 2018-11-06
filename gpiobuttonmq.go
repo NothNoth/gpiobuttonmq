@@ -166,7 +166,7 @@ func (bmq *GPIOButtonMQ) EmitEvents() error {
 			continue
 		}
 
-		if (state == pressed) && (pressed == false) {
+		if (state == true) && (pressed == false) {
 			pressed = true
 			pressStart = time.Now()
 		}
@@ -176,7 +176,7 @@ func (bmq *GPIOButtonMQ) EmitEvents() error {
 			pressDuration := time.Since(pressStart)
 
 			buf := make([]byte, 8)
-			binary.BigEndian.PutUint64(buf, uint64(pressDuration.Nanoseconds()/1000))
+			binary.BigEndian.PutUint64(buf, uint64(pressDuration.Nanoseconds()/1000000))
 
 			err := bmq.ch.Publish(
 				"",                   // exchange
@@ -190,7 +190,7 @@ func (bmq *GPIOButtonMQ) EmitEvents() error {
 			if err != nil {
 				continue
 			}
-			log.Printf("Sent button press (%d ms)", uint64(pressDuration.Nanoseconds()/1000))
+			log.Printf("Sent button press (%d ms)", uint64(pressDuration.Nanoseconds()/1000000))
 		}
 
 	}
