@@ -3,7 +3,7 @@
 GPIO button service for rabbitmq
 
 
-Simple service watching for button press on a GPIO pin (tested on a Beaglebone) and sending a message on a rabbitMQ channel upon release (with press duration).
+Simple service watching for button press on a GPIO pin (tested on a Beaglebone) and sending a message on a rabbitMQ exchange upon release (with press duration).
 
 ## Config
 
@@ -17,7 +17,7 @@ Simple service watching for button press on a GPIO pin (tested on a Beaglebone) 
 
 ## AMQP
 
-| AMQP channel | IN/OUT | Content-Type | Data | Description |
+| AMQP exchange | IN/OUT | Content-Type | Data | Description |
 | ------------ | ------ | ------------ | ---- | ----------- |
 | gpiobutton_events | OUT | application/button_press | Timestamp in ms | Emitted when the button is released, data contains the pressure duration |
 | gpiobutton_ctrl   | IN  | --         | --   | Unused      |

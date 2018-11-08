@@ -21,34 +21,12 @@ import (
 // P8_8 is 67
 // etc.
 
-const (
-	i2cAddress = 0x4B
-	i2cLane    = 2
-)
-
-type Controls struct {
-	button *bbhw.MMappedGPIO
-}
-
-func New() *Controls {
-	var ctrl Controls
-	ctrl.button = bbhw.NewMMappedGPIO(2, bbhw.IN) // Right grove port is P9_22
-
-	return &ctrl
-}
-
-func (ctrl *Controls) Destroy() {
-}
-
-func (ctrl *Controls) GetPressed() (bool, error) {
-	st, err := ctrl.button.GetState()
-	if err != nil {
-		return false, err
-	}
-
-	return st, nil
-}
 */
+
+const (
+	exchangeCtrl   = "gpiobutton_ctrl"
+	exchangeEvents = "gpiobutton_events"
+)
 
 type GPIOButtonConfig struct {
 	I2CAddress byte
@@ -58,13 +36,12 @@ type GPIOButtonConfig struct {
 }
 
 type GPIOButtonMQ struct {
-	config      GPIOButtonConfig
-	ctrl        *bbhw.MMappedGPIO
-	killed      bool
-	conn        *amqp.Connection
-	ch          *amqp.Channel
-	ctrlQueue   amqp.Queue
-	streamQueue amqp.Queue
+	config    GPIOButtonConfig
+	ctrl      *bbhw.MMappedGPIO
+	killed    bool
+	conn      *amqp.Connection
+	ch        *amqp.Channel
+	ctrlQueue amqp.Queue
 }
 
 func InitGPIOButtonMQ(configFile string) (*GPIOButtonMQ, error) {
@@ -93,27 +70,49 @@ func InitGPIOButtonMQ(configFile string) (*GPIOButtonMQ, error) {
 		return nil, err
 	}
 
-	//Create control queue
-	bmq.ctrlQueue, err = bmq.ch.QueueDeclare(
-		"gpiobutton_ctrl", // name
-		false,             // durable
-		false,             // delete when unused
-		false,             // exclusive
-		false,             // no-wait
-		nil,               // arguments
+	//Setup Control exchange & queue
+	err = bmq.ch.ExchangeDeclare(
+		exchangeCtrl, // name
+		"fanout",     // type
+		true,         // durable
+		false,        // auto-deleted
+		false,        // internal
+		false,        // no-wait
+		nil,          // arguments
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	//Create events queue
-	bmq.streamQueue, err = bmq.ch.QueueDeclare(
-		"gpiobutton_events", // name
-		false,               // durable
-		false,               // delete when unused
-		false,               // exclusive
-		true,                // no-wait
-		nil,                 // arguments
+	bmq.ctrlQueue, err = bmq.ch.QueueDeclare(
+		"",    // name
+		false, // durable
+		false, // delete when usused
+		true,  // exclusive
+		false, // no-wait
+		nil,   // arguments
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	//Bind this queue to this exchange so that exchange will publish here
+	err = bmq.ch.QueueBind(
+		bmq.ctrlQueue.Name, // queue name
+		"",                 // routing key
+		exchangeCtrl,       // exchange
+		false,
+		nil)
+
+	//Setup events exchange
+	err = bmq.ch.ExchangeDeclare(
+		exchangeEvents, // name
+		"fanout",       // type
+		true,           // durable
+		false,          // auto-deleted
+		false,          // internal
+		false,          // no-wait
+		nil,            // arguments
 	)
 	if err != nil {
 		return nil, err
@@ -179,10 +178,10 @@ func (bmq *GPIOButtonMQ) EmitEvents() error {
 			binary.BigEndian.PutUint64(buf, uint64(pressDuration.Nanoseconds()/1000))
 
 			err := bmq.ch.Publish(
-				"",                   // exchange
-				bmq.streamQueue.Name, // routing key
-				false,                // mandatory
-				false,                // immediate
+				exchangeEvents, // exchange
+				"",             // routing key
+				false,          // mandatory
+				false,          // immediate
 				amqp.Publishing{
 					ContentType: fmt.Sprintf("application/button_press"),
 					Body:        buf,
