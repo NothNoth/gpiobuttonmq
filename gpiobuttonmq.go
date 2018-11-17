@@ -33,6 +33,7 @@ type GPIOButtonConfig struct {
 	I2CLane    int
 	GpioPin    uint
 	RmqServer  string
+	ButtonName string
 }
 
 type GPIOButtonMQ struct {
@@ -183,13 +184,13 @@ func (bmq *GPIOButtonMQ) EmitEvents() error {
 				false,          // mandatory
 				false,          // immediate
 				amqp.Publishing{
-					ContentType: fmt.Sprintf("application/button_press"),
+					ContentType: fmt.Sprintf("application/button_press_%s", bmq.config.ButtonName),
 					Body:        buf,
 				})
 			if err != nil {
 				continue
 			}
-			log.Printf("Sent button press (%d ms)", uint64(pressDuration.Nanoseconds()/1000000))
+			log.Printf("Sent button press %s (%d ms)", fmt.Sprintf("application/button_press_%s", bmq.config.ButtonName), uint64(pressDuration.Nanoseconds()/1000000))
 		}
 
 	}
